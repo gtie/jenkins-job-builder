@@ -134,13 +134,18 @@ import io
 import logging
 import os
 import re
+import subprocess
+import json
 
 import yaml
+import yaml.nodes
 from yaml.constructor import BaseConstructor
 from yaml.representer import BaseRepresenter
 from yaml import YAMLObject
 
 from collections import OrderedDict
+from collections import Iterable
+
 
 
 logger = logging.getLogger(__name__)
@@ -405,6 +410,53 @@ class YamlIncludeRawDeprecated(DeprecatedTag):
 class YamlIncludeRawEscapeDeprecated(DeprecatedTag):
     yaml_tag = u'!include-raw-escape'
     _new = YamlIncludeRawEscape
+
+class YamlGitBranch(BaseYAMLObject):
+    yaml_tag = u'!git-branch'
+
+    cmd_branch = ('git','rev-parse', '--abbrev-ref','HEAD')
+
+    @classmethod
+    def _get_external_git_out(cls, cmd_args, node):
+        """Call the provided command, with error handling and output strip"""
+        try:
+            logger.debug('Calling external command: %s', cmd_args)
+            out = subprocess.check_output(cmd_args)
+        except subprocess.CalledProcessError as err:
+            raise yaml.constructor.ConstructorError(
+                None, None, "External Git command failed at node %s: %s " \
+                 % (node.id, err.output), node.start_mark)
+        return out.strip()
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        out = cls._get_external_git_out(cls.cmd_branch, node)
+        to_lstrip = 'refs/heads/'
+        if out.startswith(to_lstrip):
+            out = out[len(to_lstrip):]
+        return out
+
+class YamlJsonEncode(BaseYAMLObject):
+    yaml_tag = u'!json-encode'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        #Lists of nodes are not nodes themselves
+        if isinstance(node, yaml.nodes.MappingNode):
+            dummy_tag = 'tag:yaml.org,2002:map'
+        elif isinstance(node, yaml.nodes.SequenceNode):
+            dummy_tag = 'tag:yaml.org,2002:seq'
+        else:
+            raise yaml.constructor.ConstructorError(
+                None, None, "Only sequences and mappings accepted" , \
+                node.start_mark)
+        #We need to pass a node to construct_object; our node's tag is no good
+        dummy_node = node.__class__(tag=dummy_tag, value=node.value)
+        # Generate a python list/dict based on the dummy node
+        py_struct = loader.construct_object(dummy_node, deep=True)
+        result = json.dumps(py_struct)
+        # End result needs to be escaped
+        return loader.escape_callback(result)
 
 
 class LazyLoaderCollection(object):

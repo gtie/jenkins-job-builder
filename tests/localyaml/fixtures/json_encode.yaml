@@ -1,0 +1,36 @@
+- project:
+    name: "test-json-encode"
+    foo: 'bar'
+    json_var1: !json-encode
+        - foo
+        - true
+        - bar:
+             flat: false
+    var: !json-encode
+        foo:
+            - bar
+            - 2
+            - true
+    jobs:
+      # Define {var} explicitly in the "arglist"
+      - "test-job-json-encode-{label}":
+          label: 1
+          var: !json-encode
+            - foo
+            - true
+            - bar:
+                 flat: false
+      # USe {var} implicityl from context
+      - "test-job-json-encode-{label}":
+          label: 2
+# Following use-case does not work - results in double-escaped curly braces due
+# to {var} being strformatted against the escaped version of the json output
+#      - "test-job-json-encode-{label}":
+#          label: 3
+#          var: '{json_var1}'
+
+- job-template:
+    name: "test-job-json-encode-{label}"
+    builders:
+        - shell: echo {var} 
+

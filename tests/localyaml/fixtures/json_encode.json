@@ -1,0 +1,33 @@
+[
+    {
+        "project": {
+            "name": "test-json-encode",
+            "foo": "bar",
+            "json_var1": "[\"foo\", true, {{\"bar\": {{\"flat\": false}}}}]",
+            "var": "{{\"foo\": [\"bar\", 2, true]}}",
+            "jobs": [
+                {
+                    "test-job-json-encode-{label}": {
+                        "label": 1,
+                        "var": "[\"foo\", true, {{\"bar\": {{\"flat\": false}}}}]"
+                    }
+                },
+                {
+                    "test-job-json-encode-{label}": {
+                        "label": 2
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "job-template": {
+            "name": "test-job-json-encode-{label}",
+            "builders": [
+                {
+                    "shell": "echo {var}"
+                }
+            ]
+        }
+    }
+]
